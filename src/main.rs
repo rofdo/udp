@@ -1,9 +1,8 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
-use std::io::Bytes;
 use std::net::{SocketAddr, UdpSocket};
 use std::sync::{Arc, Mutex};
-use std::thread::{self, Thread};
+use std::thread;
 use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -24,11 +23,12 @@ struct Args {
 
 fn spawn_keep_alive(target: SocketAddr, socket: Arc<Mutex<UdpSocket>>, playerid: String) {
     thread::spawn(
-        move |/*target: SocketAddr, socket: Arc<Mutex<UdpSocket>>*/| {
+        move || {
         loop {
             let lock = socket.lock().unwrap();
             let message = Message::KeepAlive(playerid.to_string());
-            lock.send_to(&bincode::serialize(&message).unwrap(), target);
+            lock.send_to(&bincode::serialize(&message).unwrap(), target)
+                .expect("Couldn't send data");
             println!("Send Heartbeat");
             drop(lock);
             thread::sleep(Duration::from_secs(1));
@@ -47,10 +47,8 @@ fn main() {
     let mut buf = [0u8; 1024];
     loop {
         while let Ok((size, src_addr)) = socket.lock().unwrap().recv_from(&mut buf) {
-            //let (size, src_addr) = socket.lock().unwrap().recv_from(&mut buf).expect("Didn't receive anything");
             println!("size: {}", size);
             println!("src: {}", src_addr);
-            //println!("data: {:?}", buf);
 
             let bytes = buf[..size].to_vec();
             let message_response: Message = bincode::deserialize(&bytes).unwrap();
